@@ -1,4 +1,13 @@
-<title>Charlize Turns 17</title>
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>ur invited to charlize's 17th bday ♡</title>
+<meta property="og:title" content="ur invited to charlize's 17th bday ♡">
+<meta property="og:description" content="fri oct 23 · 34 park · tap to open ur invite hehe">
+<meta name="description" content="fri oct 23 · 34 park · tap to open ur invite hehe">
+<meta name="theme-color" content="#fde9f1">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@400;500;600;700&family=Silkscreen&display=swap">
 <style>
@@ -12,7 +21,8 @@
   color-scheme:light;
 }
 *{box-sizing:border-box}
-body{background:var(--bg);color:var(--ink);font-family:var(--px);font-size:16px;line-height:1.5;
+html{margin:0}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--px);font-size:16px;line-height:1.5;
   padding-inline:16px;padding-block:28px 56px;overflow-x:hidden;
   background-image:radial-gradient(#f6cddd 2px,transparent 2px);background-size:24px 24px;background-position:0 0}
 img.pix,.pix{image-rendering:pixelated;image-rendering:crisp-edges}
@@ -171,6 +181,8 @@ h2 svg{width:16px;height:14px;color:var(--hot);vertical-align:1px;margin:0 6px}
 @keyframes jump{0%,100%{transform:none}50%{transform:translateY(-6px)}}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 </style>
+</head>
+<body>
 
 <svg width="0" height="0" style="position:absolute" aria-hidden="true">
   <symbol id="ph" viewBox="0 0 7 6" shape-rendering="crispEdges">
@@ -447,7 +459,9 @@ h2 svg{width:16px;height:14px;color:var(--hot);vertical-align:1px;margin:0 6px}
   const SLOTS=[];for(let m=15*60;m<22*60;m+=30)SLOTS.push(m);
   const fmt=m=>{let h=Math.floor(m/60)%12||12,mm=m%60;return h+':'+String(mm).padStart(2,'0');};
   const isTbd=m=>m>=18*60+30&&m<19*60+30;
-  let picked=new Set(),going=true,all=[],prefilled=false,loading=false;
+  let picked=new Set(),going=true,all=[],prefilled=false,loading=false,pending=0;
+  function cacheList(){store.set('c17_list',JSON.stringify(all));}
+  try{const c=JSON.parse(store.get('c17_list')||'null');if(Array.isArray(c))all=c;}catch(e){}
   const slotsEl=$('slots'),statusEl=$('status');
 
   function ranges(slots){
@@ -487,8 +501,10 @@ h2 svg{width:16px;height:14px;color:var(--hot);vertical-align:1px;margin:0 6px}
     try{
       const url=API+'?me='+encodeURIComponent(myId);
       const res=await fetch(url);const d=await res.json();
+      if(pending)return true;
       all=(d.guests||[]).map(g=>({name:String(g.name||''),going:!!g.going,slots:Array.isArray(g.slots)?g.slots.map(Number):[],
         diet:String(g.diet||''),notes:String(g.notes||''),me:!!g.me}));
+      cacheList();
       if(d.mine&&!prefilled){prefilled=true;const m=d.mine;
         if(!$('name').value)$('name').value=m.name||'';
         picked=new Set((m.slots||[]).map(Number));setGoing(!!m.going);
@@ -504,18 +520,25 @@ h2 svg{width:16px;height:14px;color:var(--hot);vertical-align:1px;margin:0 6px}
     if(!name){statusEl.className='status';statusEl.textContent='put ur name first!!';$('name').focus();return;}
     if(going&&!picked.size){statusEl.className='status';statusEl.textContent='tap at least one time u can come';return;}
     if(!ready){statusEl.className='status';statusEl.textContent='rsvps aren’t hooked up yet (the sheet link is missing)';return;}
-    $('save').disabled=true;statusEl.className='status';statusEl.textContent='sending…';
+    const payload={id:myId,name,going,slots:going?[...picked].sort((a,b)=>a-b):[],diet:going?$('diet').value.trim():'',notes:$('notes').value.trim()};
+    // show it right away, save in the background
+    const before=all;
+    all=all.filter(r=>!r.me).concat([{name,going,slots:payload.slots,diet:'',notes:'',me:true}]);
+    renderSlots();renderGuests();cacheList();
+    statusEl.className='status ok';statusEl.textContent=going?'yayyy ur on the list!! ♡':'aww we’ll miss u ♡';
+    $('save').textContent='update rsvp ♡';prefilled=true;
+    if(going)hearts();
+    pending++;
     try{
-      const res=await fetch(API,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},
-        body:JSON.stringify({id:myId,name,going,slots:going?[...picked]:[],diet:going?$('diet').value.trim():'',notes:$('notes').value.trim()})});
+      const res=await fetch(API,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(payload)});
       const d=await res.json();
       if(!d.ok)throw new Error(d.error||'failed');
-      statusEl.className='status ok';statusEl.textContent=going?'yayyy ur on the list!! ♡':'aww we’ll miss u ♡';
-      $('save').textContent='update rsvp ♡';prefilled=true;
-      if(going)hearts();
-      load();
-    }catch(e){statusEl.className='status';statusEl.textContent='oops that didn’t save, try again in a sec';}
-    $('save').disabled=false;
+      pending--;load();
+    }catch(e){
+      pending--;all=before;renderSlots();renderGuests();cacheList();
+      statusEl.className='status';statusEl.textContent='oops that didn’t save, tap send again';
+      $('save').textContent='send rsvp ♡';
+    }
   };
 
 
@@ -524,3 +547,5 @@ h2 svg{width:16px;height:14px;color:var(--hot);vertical-align:1px;margin:0 6px}
   setInterval(()=>{if(!document.hidden)load();},20000);
 })();
 </script>
+</body>
+</html>
